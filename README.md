@@ -1,3 +1,3 @@
 # Chess-in-JS
 
-## A Work in Progress
+A Work in Progress
