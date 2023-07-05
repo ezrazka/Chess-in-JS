@@ -9,10 +9,9 @@ class Game {
         this.enPassantSquare = this.fen.split(" ")[3];
         this.halfMoves = this.fen.split(" ")[4];
         this.fullMoves = this.fen.split(" ")[5];
-
+        
         this.updateBoardData();
-
-        this.board = new Board(this, 512, "antiquewhite", "indianred", true);
+        this.board = new Board(this, true);
     }
 
     getPiece(pieceLetter, i, j) {

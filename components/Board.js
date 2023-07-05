@@ -1,22 +1,12 @@
 "use strict";
 
 class Board {
-    constructor(game, maxSize, lightSquareColor, darkSquareColor, notation) {
+    constructor(game, showNotation) {
         this.game = game;
-        this.maxSize = maxSize;
-        this.lightSquareColor = lightSquareColor;
-        this.darkSquareColor = darkSquareColor;
-        this.notation = notation;
-
-        this.size = Math.min(maxSize, screen.width, screen.height);
+        this.showNotation = showNotation;
         this.isWhitePerspective = true;
-    }
 
-    getElementIndex(element) {
-        const elementParent = element.parentElement;
-        const elementIndex = Array.from(elementParent.children).indexOf(element);
-
-        return elementIndex;
+        this.initializeBoard();
     }
 
     reverseChildrenOfElements(elements) {
@@ -27,12 +17,8 @@ class Board {
             const elementFirstChildren = Array.from(elementFirst.children);
             const elementLastChildren = Array.from(elementLast.children);
 
-            elementFirstChildren.forEach((elementFirstChild) => {
-                elementFirstChild.remove();
-            });
-            
-            elementLastChildren.forEach((elementLastChild) => {
-                elementLastChild.remove();
+            [...elementFirstChildren, ...elementLastChildren].forEach((elementChild) => {
+                elementChild.remove();
             });
 
             elementFirstChildren.forEach((elementFirstChild) => {
@@ -49,12 +35,11 @@ class Board {
         square.appendChild(squareChild);
 
         const squareChildrenSelectors = [
-            ".squareRect",
-            ".notationLetter",
-            ".notationNumber",
-            ".squareRectHighlight",
-            ".squareRectStroke",
-            ".pieceImage"
+            ".notation-letter",
+            ".notation-number",
+            ".square-highlight",
+            ".square-outline",
+            ".piece-icon"
         ];
 
         squareChildrenSelectors.forEach((squareChildrenSelector) => {
@@ -66,152 +51,107 @@ class Board {
         });
     }
 
-    getPieceFromPieceImage(initialPieceImage) {
-        let piece = null;
-
-        const rows = document.querySelectorAll(".row");
-
-        rows.forEach((row, rowIndex) => {
-            const squares = row.querySelectorAll(".square");
-
-            squares.forEach((square, squareIndex) => {
-                const pieceImage = square.querySelector(".pieceImage");
-
-                console.log(pieceImage, initialPieceImage)
-                if (pieceImage !== initialPieceImage) {
-                    return;
-                }
-                
-                piece = this.game.boardData[rowIndex][squareIndex];
-            });
-        });
-
-        return piece;
-    }
-
     addDragEventListeners() {
-        const squareSize = this.size / 8;
-        const strokeWidth = this.size / 128;
+        const pieceIcons = document.querySelectorAll(".piece-icon");
         
-        let initialSquare = null;
-        
-        const board = document.getElementById("board");
-        const pieceImages = document.querySelectorAll(".pieceImage");
-        
-        pieceImages.forEach((pieceImage) => {
+        pieceIcons.forEach((pieceIcon) => {
             const onMouseDown = (event) => {
                 event.preventDefault();
-
-                initialSquare = pieceImage.parentElement;
-                
-                board.appendChild(pieceImage);
-
+        
+                pieceIcon.classList.add("dragging");
+        
                 onMouseMove(event);
-                
+    
                 document.addEventListener("mousemove", onMouseMove);
                 document.addEventListener("mouseup", onMouseUp);
             }
 
             const onMouseMove = (event) => {
-                const boardOffsetLeft = parseInt(board.getBoundingClientRect().left);
-                const boardOffsetTop = parseInt(board.getBoundingClientRect().top);
-
-                const pieceImageX = event.clientX - boardOffsetLeft - squareSize / 2;
-                const pieceImageY = event.clientY - boardOffsetTop - squareSize / 2;
-                const positiveLimit = this.size - squareSize / 2;
-                const negativeLimit = -(squareSize / 2);
+                pieceIcon.style.transform = "";
                 
-                pieceImage.setAttribute("x", Math.max(Math.min(pieceImageX, positiveLimit), negativeLimit));
-                pieceImage.setAttribute("y", Math.max(Math.min(pieceImageY, positiveLimit), negativeLimit));
-                pieceImage.style.cursor = "grabbing";
-
-                const squareRectStroke = document.querySelector(".squareRectStroke");
-                squareRectStroke?.remove();
-
+                const board = document.getElementById("board");
+    
+                const boardRect = board.getBoundingClientRect();
+                const pieceIconRect = pieceIcon.getBoundingClientRect();
+    
+                const pieceIconCenterX1 = pieceIconRect.left + pieceIconRect.width / 2;
+                const pieceIconCenterY1 = pieceIconRect.top + pieceIconRect.height / 2;
+                const pieceIconCenterX2 = Math.max(Math.min(event.clientX, boardRect.right), boardRect.left);
+                const pieceIconCenterY2 = Math.max(Math.min(event.clientY, boardRect.bottom), boardRect.top);
+    
+                const pieceIconCenterDX = pieceIconCenterX2 - pieceIconCenterX1;
+                const pieceIconCenterDY = pieceIconCenterY2 - pieceIconCenterY1;
+    
+                pieceIcon.style.transform = `translate(${pieceIconCenterDX}px, ${pieceIconCenterDY}px)`;
+    
+                const squareOutline = document.querySelector(".square-outline");
+                squareOutline?.remove();
+    
                 const hoveredElements = document.elementsFromPoint(event.clientX, event.clientY);
-                const hoveredSquareRect = hoveredElements.find((hoveredElement) => {
-                    return hoveredElement.matches(".squareRect");
+                const hoveredSquare = hoveredElements.find((hoveredElement) => {
+                    return hoveredElement.matches(".square");
                 });
-
-                if (hoveredSquareRect == null) {
-                    return;
+    
+                if (hoveredSquare != null) {
+                    const hoveredSquareOutline = document.createElement("div");
+                    hoveredSquareOutline.className = "square-outline";
+    
+                    this.insertSquareChild(hoveredSquare, hoveredSquareOutline);
                 }
-
-                const hoveredSquare = hoveredSquareRect.parentElement;
-
-                const hoveredSquareRectStroke = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-
-                hoveredSquareRectStroke.setAttribute("class", "squareRectStroke");
-                hoveredSquareRectStroke.setAttribute("width", squareSize - strokeWidth);
-                hoveredSquareRectStroke.setAttribute("height", squareSize - strokeWidth);
-                hoveredSquareRectStroke.setAttribute("x", strokeWidth / 2);
-                hoveredSquareRectStroke.setAttribute("y", strokeWidth / 2);
-                hoveredSquareRectStroke.setAttribute("fill", "none");
-                hoveredSquareRectStroke.setAttribute("stroke", "white");
-                hoveredSquareRectStroke.setAttribute("stroke-opacity", 0.5);
-                hoveredSquareRectStroke.setAttribute("stroke-width", strokeWidth);
-                
-                this.insertSquareChild(hoveredSquare, hoveredSquareRectStroke)
             }
 
             const onMouseUp = (event) => {
-                const hoveredElements = document.elementsFromPoint(event.clientX, event.clientY);
-                const hoveredSquareRect = hoveredElements.find((hoveredElement) => {
-                    return hoveredElement.matches(".squareRect");
-                });
-                const hoveredSquare = hoveredSquareRect?.parentElement;
-                const piece = this.getPieceFromPieceImage(pieceImage);
+                // const piece = this.getPieceFrompieceIcon(pieceIcon);
                 // console.log(piece)
 
-                pieceImage.setAttribute("x", 0);
-                pieceImage.setAttribute("y", 0);
-                pieceImage.style.cursor = "grab";
+                // console.log(piece.validMoves);
+                // console.log(piece?.validMoves.includes([this.getElementIndex(hoveredSquare.parentElement), this.getElementIndex(hoveredSquare)]))
 
-                console.log(piece.validMoves);
-                console.log(piece?.validMoves.includes([this.getElementIndex(hoveredSquare.parentElement), this.getElementIndex(hoveredSquare)]))
+                const initialSquare = pieceIcon.parentElement;
 
-                if (hoveredSquare != null && piece?.validMoves.includes([this.getElementIndex(hoveredSquare.parentElement), this.getElementIndex(hoveredSquare)])) {
-                    hoveredSquare.querySelector(".pieceImage")?.remove();
-                    this.insertSquareChild(hoveredSquare, pieceImage);
+                const hoveredElements = document.elementsFromPoint(event.clientX, event.clientY);
+                const hoveredSquare = hoveredElements.find((hoveredElement) => {
+                    return hoveredElement.matches(".square");
+                });
+
+                if (hoveredSquare != null) {
+                    const hoveredPieceIcon = hoveredSquare.querySelector(".piece-icon");
+                    hoveredPieceIcon?.remove();
+
+                    this.insertSquareChild(hoveredSquare, pieceIcon);
                 } else {
-                    this.insertSquareChild(initialSquare, pieceImage);
+                    this.insertSquareChild(initialSquare, pieceIcon);
                 }
                 
-                const squareRectStroke = document.querySelector(".squareRectStroke");
-                squareRectStroke?.remove();
+                pieceIcon.style.transform = "";
+                pieceIcon.classList.remove("dragging");
 
-                const squareRectHighlight = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                const squareOutline = document.querySelector(".square-outline");
+                squareOutline?.remove();
 
-                squareRectHighlight.setAttribute("class", "squareRectHighlight");
-                squareRectHighlight.setAttribute("width", squareSize);
-                squareRectHighlight.setAttribute("height", squareSize);
-                squareRectHighlight.setAttribute("x", 0);
-                squareRectHighlight.setAttribute("y", 0);
-                squareRectHighlight.setAttribute("fill", "yellow");
-                squareRectHighlight.setAttribute("opacity", 0.5);
+                const squareHighlight = document.createElement("div");
+                squareHighlight.className = "square-highlight";
 
                 if (hoveredSquare != null && initialSquare !== hoveredSquare) {
-                    const squareRectHighlights = document.querySelectorAll(".squareRectHighlight");
+                    const squareHighlights = document.querySelectorAll(".square-highlight");
 
-                    squareRectHighlights.forEach((squareRectHighlight) => {
-                        squareRectHighlight.remove();
+                    squareHighlights.forEach((squareHighlight) => {
+                        squareHighlight.remove();
                     });
 
-                    this.insertSquareChild(initialSquare, squareRectHighlight);
-                    this.insertSquareChild(hoveredSquare, squareRectHighlight.cloneNode());
+                    this.insertSquareChild(initialSquare, squareHighlight);
+                    this.insertSquareChild(hoveredSquare, squareHighlight.cloneNode());
                 }
                 
                 document.removeEventListener("mousemove", onMouseMove);
                 document.removeEventListener("mouseup", onMouseUp);
             }
 
-            pieceImage.addEventListener("mousedown", onMouseDown);
+            pieceIcon.addEventListener("mousedown", onMouseDown);
         });
     }
 
-    showPieces() {
-        const squareSize = this.size / 8;
-        
+    loadPieces() {
         const rows = document.querySelectorAll(".row");
 
         rows.forEach((row, rowIndex) => {
@@ -220,98 +160,44 @@ class Board {
             squares.forEach((square, squareIndex) => {
                 const piece = this.game.boardData[rowIndex][squareIndex];
 
-                if (piece === null) {
+                if (piece == null) {
                     return;
                 }
 
-                const pieceImage = document.createElementNS("http://www.w3.org/2000/svg", "image");
+                const pieceIcon = document.createElement("div");
+                pieceIcon.className = "piece-icon";
+                pieceIcon.style.backgroundImage = `url(${piece.imageSrc})`;
 
-                pieceImage.setAttribute("class", "pieceImage");
-                pieceImage.setAttribute("x", 0);
-                pieceImage.setAttribute("y", 0);
-                pieceImage.setAttribute("width", squareSize);
-                pieceImage.setAttribute("height", squareSize);
-                pieceImage.setAttribute("href", piece.imageSrc);
-                pieceImage.style.cursor = "grab";
-
-
-                this.insertSquareChild(square, pieceImage);
-
+                this.insertSquareChild(square, pieceIcon);
             });
         });
 
         this.addDragEventListeners();
     }
     
-    showNotation() {
-        const squareSize = this.size / 8;
-        const notationTextSize = this.size / 32;
-        const notationTextPadding = this.size / 128;
-        
+    loadNotation() {
         const notationLetterSquares = document.querySelectorAll(".row:last-child .square");
         const notationNumberSquares = document.querySelectorAll(".square:first-child");
         
         notationLetterSquares.forEach((notationLetterSquare, index) => {
-            const notationLetter = document.createElementNS("http://www.w3.org/2000/svg", "text");
-            notationLetter.innerHTML = this.isWhitePerspective
-                ? String.fromCharCode(97 + index)
-                : String.fromCharCode(104 - index);
-            
-            notationLetter.setAttribute("class", "notationLetter");
-            notationLetter.setAttribute("x", squareSize - notationTextPadding);
-            notationLetter.setAttribute("y", squareSize - notationTextPadding);
-            notationLetter.setAttribute("dominant-baseline", "ideographic");
-            notationLetter.setAttribute("text-anchor", "end");
-            notationLetter.setAttribute("font-size", notationTextSize);
-            notationLetter.setAttribute("font-weight", "bold");
-            notationLetter.setAttribute("font-family", "Segoe UI, Tahoma, Geneva, Verdana, sans-serif");
-            notationLetter.style.userSelect = "none";
-            
-            const squareRect = notationLetterSquare.querySelector(".squareRect");
-            const squareRectColor = squareRect.getAttribute("fill");
-            
-            if (squareRectColor === this.lightSquareColor) {
-                notationLetter.setAttribute("fill", this.darkSquareColor);
-            } else {
-                notationLetter.setAttribute("fill", this.lightSquareColor);
-            }
-            
+            const notationLetter = document.createElement("span");
+            notationLetter.textContent = String.fromCharCode(this.isWhitePerspective ? 97 + index : 104 - index);
+            notationLetter.className = "notation-letter";
+
             this.insertSquareChild(notationLetterSquare, notationLetter);
         });
         
         notationNumberSquares.forEach((notationNumberSquare, index) => {
-            const notationNumber = document.createElementNS("http://www.w3.org/2000/svg", "text");
-            notationNumber.innerHTML = this.isWhitePerspective
-                ? 8 - index
-                : index + 1;
-            
-            notationNumber.setAttribute("class", "notationNumber");
-            notationNumber.setAttribute("x", notationTextPadding);
-            notationNumber.setAttribute("y", notationTextPadding);
-            notationNumber.setAttribute("dominant-baseline", "hanging");
-            notationNumber.setAttribute("text-anchor", "start");
-            notationNumber.setAttribute("font-size", notationTextSize);
-            notationNumber.setAttribute("font-weight", "bold");
-            notationNumber.setAttribute("font-family", "Segoe UI, Tahoma, Geneva, Verdana, sans-serif");
-            notationNumber.style.userSelect = "none";
-            
-            const squareRect = notationNumberSquare.querySelector(".squareRect");
-            const squareRectColor = squareRect.getAttribute("fill");
-
-            if (squareRectColor === this.lightSquareColor) {
-                notationNumber.setAttribute("fill", this.darkSquareColor);
-            } else {
-                notationNumber.setAttribute("fill", this.lightSquareColor);
-            }
+            const notationNumber = document.createElement("span");
+            notationNumber.textContent = this.isWhitePerspective ? 8 - index : index + 1;
+            notationNumber.className = "notation-number";
 
             this.insertSquareChild(notationNumberSquare, notationNumber);
         });
     }
 
     flipBoard() {
-        const board = document.getElementById("board");
-
-        const rows = board.querySelectorAll('.row');
+        const rows = document.querySelectorAll('.row');
         this.reverseChildrenOfElements(rows);
 
         rows.forEach((row) => {
@@ -319,73 +205,26 @@ class Board {
             this.reverseChildrenOfElements(squares);
         });
 
-        if (this.notation) {
-            const notationLetters = document.querySelectorAll(".notationLetter");
-            const notationNumbers = document.querySelectorAll(".notationNumber");
+        if (this.showNotation) {
+            const notationLetters = document.querySelectorAll(".notation-letter");
+            const notationNumbers = document.querySelectorAll(".notation-number");
 
-            notationLetters.forEach((notationLetter) => {
-                notationLetter.remove()
-            });
-
-            notationNumbers.forEach((notationNumber) => {
-                notationNumber.remove()
+            [...notationLetters, ...notationNumbers].forEach((notationCharacter) => {
+                notationCharacter.remove()
             });
 
             this.isWhitePerspective = !this.isWhitePerspective;
-            this.showNotation();
+            this.loadNotation();
         }
     }
 
-    showBoard() {
-        const squareSize = this.size / 8;
+    initializeBoard() {
+        this.loadPieces();
 
-        const board = document.getElementById("board");
-        const rows = document.querySelectorAll(".row");
-        const squares = document.querySelectorAll(".square");
-        const lightSquares = document.querySelectorAll(
-            ".row:nth-of-type(odd) .square:nth-of-type(odd), .row:nth-of-type(even) .square:nth-of-type(even)"
-        );
-        const darkSquares = document.querySelectorAll(
-            ".row:nth-of-type(odd) .square:nth-of-type(even), .row:nth-of-type(even) .square:nth-of-type(odd)"
-        );
-
-        board.setAttribute("width", this.size);
-        board.setAttribute("height", this.size);
-
-        rows.forEach((row, index) => {
-            row.setAttribute("transform", `translate(0, ${squareSize * index})`);
-        });
-
-        squares.forEach((square, index) => {
-            square.setAttribute("transform", `translate(${squareSize * (index % 8)}, 0)`);
-
-            const squareRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-
-            squareRect.setAttribute("class", "squareRect");
-            squareRect.setAttribute("width", squareSize);
-            squareRect.setAttribute("height", squareSize);
-            squareRect.setAttribute("x", 0);
-            squareRect.setAttribute("y", 0);
-
-            this.insertSquareChild(square, squareRect);
-        });
-
-        lightSquares.forEach((lightSquare) => {
-            const lightSquareRect = lightSquare.querySelector(".squareRect");
-
-            lightSquareRect.setAttribute("fill", this.lightSquareColor);
-        });
-
-        darkSquares.forEach((darkSquare) => {
-            const darkSquareRect = darkSquare.querySelector(".squareRect");
-
-            darkSquareRect.setAttribute("fill", this.darkSquareColor);
-        });
-
-        this.showPieces();
-
-        if (this.notation) {
-            this.showNotation();
+        if (this.showNotation) {
+            this.loadNotation();
         }
+
+        this.flipBoard();
     }
 }
